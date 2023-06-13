@@ -26,6 +26,9 @@ def count_vehicles_by_timestamp(df, min_latitude, max_latitude, min_longitude, m
 
 
 def calculate_distance(row):
+    if row['Trajectory ID'] != row['Shifted Trajectory ID']:
+        return 0
+
     coordinates_1 = (row['Latitude'], row['Longitude'])
     coordinates_2 = (row['Shifted Latitude'], row['Shifted Longitude'])
 
@@ -40,6 +43,7 @@ def calculate_distance(row):
 
 def calculate_average_speed_by_trajectory(df):
     df_copy = df.copy()
+    df_copy[['Shifted Trajectory ID']] = df_copy[['Trajectory ID']].shift(-1)
     df_copy[['Shifted Latitude', 'Shifted Longitude']] = df_copy[['Latitude', 'Longitude']].shift(-1)
     df_copy['Distance'] = df_copy.apply(calculate_distance, axis=1)
     df_copy = df_copy.groupby(['Trajectory ID', 'Vehicle Type']).agg({'Time Stamp': 'count', 'Distance': 'sum'}).reset_index()
@@ -48,14 +52,13 @@ def calculate_average_speed_by_trajectory(df):
     return df_copy
 
 
-def generate_average_speed_result(df, speed_ranges, calculate_average_speed=True):
+def generate_average_speed_result(df, speed_ranges, output_file, calculate_average_speed=True):
     if calculate_average_speed:
         average_speed_df = calculate_average_speed_by_trajectory(df)
-        average_speed_df.to_csv('speed_data.txt', sep=',', index=False)
+        average_speed_df.to_csv(output_file, sep=',', index=False)
     else:
-        average_speed_df = prepare_data('speed_data.txt')
+        average_speed_df = prepare_data(output_file)
 
-    average_speed_df = filter_if_column_in_range(average_speed_df, 'Average Speed', 0, 150)
     cars_average_speed_df = filter_if_column_has_value(average_speed_df, 'Vehicle Type', ['CAR', 'TRUCK'])
     bikes_average_speed_df = filter_if_column_has_value(average_speed_df, 'Vehicle Type', ['BIKE'])
 
@@ -85,10 +88,11 @@ def generate_vehicles_count_in_area_result(df, areas_bounds):
 
 
 if __name__ == '__main__':
-    data = prepare_data('data.txt')
+    output_file = 'speed_data_500.txt'
+    data = prepare_data('data_500.txt')
 
-    speed_ranges = np.arange(0, 150, 5)
-    generate_average_speed_result(data, speed_ranges, True)
+    speed_ranges = np.arange(0, 60, 5)
+    generate_average_speed_result(data, speed_ranges, output_file, True)
 
     areas_bounds = [[50.07301, 50.07575, 19.91358, 19.92072]]
     generate_vehicles_count_in_area_result(data, areas_bounds)
